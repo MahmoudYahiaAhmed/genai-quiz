@@ -98,6 +98,8 @@ ok(res.levels.easy.total === 3 && Object.values(res.sessions).every((g) => !("id
 await db.exec("update settings set exam_open = false");
 const unlocked = (await asAnon("select resume_attempt($1,$2) j", [start.attempt_id, start.token])).j.result;
 ok(unlocked.review_state === "open" && unlocked.results.length === 10 && unlocked.results[0].explanation, "full review unlocks after the exam closes");
+ok(unlocked.questions.length === 10 && unlocked.questions.every((q) => q.prompt && !("answer" in q)), "unlocked review carries question text (no answer field)");
+ok(res.questions.length === 0, "no question text in the result while the exam is open");
 await db.exec("update settings set exam_open = true");
 const res2 = (await asAnon("select submit_attempt($1,$2,'{}') j", [start.attempt_id, start.token])).j;
 ok(Number(res2.score) === expected, "re-submit does not change the grade");

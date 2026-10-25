@@ -255,7 +255,9 @@ language sql stable security definer set search_path = public as $$
     'sessions', public._result_groups(a.results, 'session'),
     'review_state', case when not s.show_review then 'hidden'
                          when s.exam_open then 'locked' else 'open' end,
-    'results', case when s.show_review and not s.exam_open then a.results else '[]'::jsonb end)
+    'results', case when s.show_review and not s.exam_open then a.results else '[]'::jsonb end,
+    -- question text travels with an unlocked review, so it works in any browser
+    'questions', case when s.show_review and not s.exam_open then public._public_questions(a.question_ids) else '[]'::jsonb end)
   from public.settings s where s.id = 1;
 $$;
 

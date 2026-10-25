@@ -70,7 +70,7 @@ class SupabaseBackend {
   listAttempts() {
     return this.table(
       this.db.from("attempts")
-        .select("id,student_name,student_id,status,question_ids,answered_count,tab_switches,score,max_score,percent,started_at,deadline,last_seen,submitted_at,terminated_reason")
+        .select("id,token,student_name,student_id,status,question_ids,answered_count,tab_switches,score,max_score,percent,started_at,deadline,last_seen,submitted_at,terminated_reason")
         .order("started_at", { ascending: false })
         .limit(1000)
     );
@@ -221,6 +221,7 @@ class LocalBackend {
       status: a.status, score: a.score, max_score: a.max_score, percent: a.percent, terminated_reason: a.terminated_reason,
       submitted_at: a.submitted_at, question_count: a.question_ids.length, levels: groups("difficulty"), sessions: groups("session"),
       review_state: reviewState, results: reviewState === "open" ? a.results : [],
+      questions: reviewState === "open" ? this.publicQuestions(a.question_ids) : [],
     };
   }
 

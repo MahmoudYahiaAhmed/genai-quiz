@@ -364,9 +364,10 @@ function exportCsv() {
     const safe = /^[\t\r=+\-@]/.test(s) ? `'${s}` : s;
     return `"${safe.replaceAll('"', '""')}"`;
   };
-  const header = ["name", "student_id", "status", "score", "max_score", "percent", "answered", "questions", "tab_switches", "started_at", "submitted_at", "terminated_reason"];
+  const base = location.href.replace(/admin\.html.*$/, "");
+  const header = ["name", "student_id", "status", "score", "max_score", "percent", "answered", "questions", "tab_switches", "started_at", "submitted_at", "terminated_reason", "resume_link"];
   const lines = filteredAttempts().map((a) =>
-    [a.student_name, a.student_id, a.status, a.score, a.max_score, a.percent, a.answered_count, a.question_ids.length, a.tab_switches, a.started_at, a.submitted_at, a.terminated_reason].map(cell).join(",")
+    [a.student_name, a.student_id, a.status, a.score, a.max_score, a.percent, a.answered_count, a.question_ids.length, a.tab_switches, a.started_at, a.submitted_at, a.terminated_reason, a.token ? `${base}#resume=${a.id}.${a.token}` : ""].map(cell).join(",")
   );
   const blob = new Blob(["﻿" + [header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
   const link = document.createElement("a");

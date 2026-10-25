@@ -106,7 +106,7 @@ export function renderResults(root, result, questions, opts = {}) {
   const percent = Number(result.percent ?? 0);
   const grade = gradeLabel(percent);
   const results = result.results ?? [];
-  const qById = new Map(questions.map((q) => [q.id, q]));
+  const qById = new Map((result.questions?.length ? result.questions : questions).map((q) => [q.id, q]));
   const byLevel = new Map(Object.entries(result.levels ?? {}));
   const bySession = Object.entries(result.sessions ?? {})
     .map(([s, v]) => ({ s: Number(s), v, pct: v.max ? v.got / v.max : 0 }))
