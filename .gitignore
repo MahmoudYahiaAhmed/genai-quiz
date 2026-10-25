@@ -1,0 +1,8 @@
+# The question bank holds the ANSWER KEY. If this repo is public, students could read it.
+# Keep it local (or in a separate private repo). Remove these lines only if the repo is private.
+bank/sessions/
+bank/build/
+supabase/seed.sql
+
+node_modules/
+.DS_Store

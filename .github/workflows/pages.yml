@@ -1,0 +1,41 @@
+name: Deploy exam to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Supabase config is filled in
+        run: |
+          if grep -q 'SUPABASE_URL: ""' public/config.js; then
+            echo "::error::public/config.js has no SUPABASE_URL — the deployed exam would not work. See README step 2."
+            exit 1
+          fi
+
+      - uses: actions/configure-pages@v5
+
+      # Only the public/ folder is published — never the bank or SQL files.
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
