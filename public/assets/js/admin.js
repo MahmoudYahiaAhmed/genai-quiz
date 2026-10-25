@@ -241,6 +241,7 @@ function renderAttemptRows() {
           : `${fmtDuration(end - Date.parse(a.started_at))}<div class="muted">used</div>`}</td>
         <td style="white-space:nowrap">
           <button class="btn sm" data-act="view" data-id="${a.id}">View</button>
+          <button class="btn sm" data-act="link" data-id="${a.id}" title="Personal link that puts this student back into their own exam on any device">Resume link</button>
           ${a.status === "in_progress" ? `<button class="btn sm" data-act="time" data-id="${a.id}" title="Give this student extra time">+ Time</button>
           <button class="btn sm danger" data-act="kill" data-id="${a.id}">Terminate</button>` : ""}
           <button class="btn sm ghost" data-act="del" data-id="${a.id}" title="Delete attempt (lets the student start again)">Reset</button>
@@ -255,6 +256,7 @@ async function onRowAction(e) {
   const a = view.attempts.find((x) => x.id === b.dataset.id);
   if (!a) return;
   if (b.dataset.act === "view") return showAttempt(a.id);
+  if (b.dataset.act === "link") return showResumeLink(a);
   if (b.dataset.act === "kill") {
     const reason = await askDialog({
       title: `Terminate ${a.student_name}'s exam?`,
@@ -309,6 +311,28 @@ async function extendTime(ids, studentName = "") {
     const n = await backend.extendTime(ids, minutes);
     toast(`Added ${minutes} min for ${n} student(s).`, "success");
     refresh();
+  } catch (err) {
+    toast(friendlyError(err), "error");
+  }
+}
+
+// The link carries the attempt's secret token, so send it only to that student.
+async function showResumeLink(a) {
+  try {
+    const full = await backend.getAttempt(a.id);
+    const base = location.href.replace(/admin\.html.*$/, "");
+    const link = `${base}#resume=${full.id}.${full.token}`;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      /* clipboard blocked — the dialog still shows the link to copy by hand */
+    }
+    await askDialog({
+      title: `Resume link for ${a.student_name}`,
+      body: "Copied to your clipboard. Send it ONLY to this student — opening it on any device puts them back into their own exam with their saved answers.",
+      input: link,
+      confirmLabel: "Done",
+    });
   } catch (err) {
     toast(friendlyError(err), "error");
   }

@@ -40,7 +40,17 @@ function persist() {
 
 // ---------------------------------------------------------------- boot
 
+// A resume link from the instructor (#resume=<attempt id>.<token>) replaces
+// whatever attempt this browser remembered, then the hash is removed.
+function takeResumeLink() {
+  const m = location.hash.match(/^#resume=([0-9a-f-]{36})\.([0-9a-f-]{36})$/i);
+  if (!m) return;
+  writeStore({ id: m[1], token: m[2] });
+  history.replaceState(null, "", location.pathname + location.search);
+}
+
 async function boot() {
+  takeResumeLink();
   const stored = readStore();
   if (stored?.id && stored?.token) {
     try {
@@ -490,6 +500,10 @@ async function recheckReview(questions, name) {
   if (!stored?.id) return;
   try {
     const res = await backend.resumeAttempt(stored.id, stored.token);
+    if (res.status === "in_progress") {
+      toast("Your exam was reopened — continue where you left off.", "success", 6000);
+      return startExam(res, stored);
+    }
     if (res.result?.review_state === "open") {
       toast("The review is open — scroll down to learn from every question.", "success");
       showResults(res.result, questions, name);
