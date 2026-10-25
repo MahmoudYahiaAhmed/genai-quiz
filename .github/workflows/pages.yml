@@ -30,6 +30,16 @@ jobs:
             exit 1
           fi
 
+      # Pages lets browsers cache files for 10 min. Stamping every local file
+      # reference with the commit id makes a browser load a matching set of
+      # files after each deploy (never a new page with an old module).
+      - name: Version file references (cache busting)
+        run: |
+          V="${GITHUB_SHA::8}"
+          sed -i -E "s#((src|href)=\"(assets/[^\"?]+|config\.js))\"#\1?v=$V\"#g" public/*.html
+          sed -i -E "s#(from \"\./[a-z]+\.js)\"#\1?v=$V\"#g" public/assets/js/*.js
+          grep -h -o -E '(src|href)="[^"]*\?v=[^"]*"|from "[^"]*\?v=[^"]*"' public/*.html public/assets/js/*.js
+
       - uses: actions/configure-pages@v5
 
       # Only the public/ folder is published — never the bank or SQL files.
