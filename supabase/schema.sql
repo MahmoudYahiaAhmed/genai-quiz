@@ -473,6 +473,27 @@ begin
 end;
 $$;
 
+-- Adds minutes to running attempts. p_ids = null → every attempt in progress.
+-- Students' timers pick up the new deadline on their next heartbeat.
+create or replace function public.admin_extend_time(p_ids uuid[], p_minutes int)
+returns int
+language plpgsql volatile security definer set search_path = public as $$
+declare n int;
+begin
+  if not public.is_admin() then
+    raise exception 'Not authorized.' using errcode = '42501';
+  end if;
+  if p_minutes is null or p_minutes < 1 or p_minutes > 600 then
+    raise exception 'Extra time must be between 1 and 600 minutes.' using errcode = 'P0001';
+  end if;
+  update public.attempts
+  set deadline = greatest(deadline, now()) + make_interval(mins => p_minutes)
+  where status = 'in_progress' and (p_ids is null or id = any(p_ids));
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
 create or replace function public.admin_question_stats() returns jsonb
 language plpgsql stable security definer set search_path = public as $$
 begin
@@ -508,4 +529,5 @@ grant execute on function public.submit_attempt(uuid, uuid, jsonb)       to anon
 grant execute on function public.is_admin()                              to authenticated; -- used by RLS policies
 grant execute on function public.admin_terminate(uuid[], text)           to authenticated;
 grant execute on function public.admin_terminate_all(text)               to authenticated;
+grant execute on function public.admin_extend_time(uuid[], int)          to authenticated;
 grant execute on function public.admin_question_stats()                  to authenticated;

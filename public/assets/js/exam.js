@@ -371,6 +371,11 @@ async function sync() {
     const res = await backend.heartbeat(exam.id, exam.token, sentAnswers, exam.tabSwitches);
     if (exam.answers === sentAnswers) exam.dirty = false;
     if (res.server_now) exam.offset = Date.parse(res.server_now) - Date.now();
+    if (res.deadline && Date.parse(res.deadline) > exam.deadline + 1000) {
+      const extra = Math.round((Date.parse(res.deadline) - exam.deadline) / 60000);
+      exam.deadline = Date.parse(res.deadline);
+      toast(`Your instructor added ${extra} extra minute${extra === 1 ? "" : "s"}.`, "success", 6000);
+    }
     setSaveState(exam.dirty ? "pending" : "saved");
     if (res.status !== "in_progress") return finish(res.result);
   } catch (err) {

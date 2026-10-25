@@ -178,6 +178,33 @@ await expectErr(() => asAnon("select public._is_correct('single','1','1')"), /pe
 const nm = (await asAnon("select start_attempt(E'\t=HYPERLINK(1)','ctrl-1','GENAI25') j")).j.student_name;
 ok(nm === "=HYPERLINK(1)", "control characters stripped from names");
 
+// --- extend time
+{
+  const x = (await asAnon("select start_attempt('Time Tester','time-1','GENAI25') j")).j;
+  const y = (await asAnon("select start_attempt('Time Tester Two','time-2','GENAI25') j")).j;
+  const before = Date.parse(x.deadline);
+  await expectErr(() => asUser("random@x.com", "select admin_extend_time(array[$1::uuid], 30)", [x.attempt_id]), /Not authorized/, "non-admin cannot extend time");
+  await expectErr(() => asUser("teacher@school.org", "select admin_extend_time(array[$1::uuid], 0)", [x.attempt_id]), /between 1 and 600/, "invalid extra minutes rejected");
+  ok((await asUser("teacher@school.org", "select admin_extend_time(array[$1::uuid], 30) n", [x.attempt_id])).rows[0].n === 1, "admin extended one attempt");
+  const hbx = (await asAnon("select heartbeat($1,$2,'{}',0) j", [x.attempt_id, x.token])).j;
+  ok(Math.round((Date.parse(hbx.deadline) - before) / 60000) === 30, "heartbeat returns deadline +30 min");
+  const yBefore = Date.parse((await one("select deadline from attempts where id=$1", [y.attempt_id])).deadline);
+  const all = (await asUser("teacher@school.org", "select admin_extend_time(null, 15) n")).rows[0].n;
+  const yAfter = Date.parse((await one("select deadline from attempts where id=$1", [y.attempt_id])).deadline);
+  ok(all >= 2 && Math.round((yAfter - yBefore) / 60000) === 15, `extend all added 15 min to every running attempt (${all})`);
+  // a student just past the deadline (inside the grace window) gets the time counted from now
+  await db.query("update attempts set deadline = now() - interval '1 minute' where id = $1", [y.attempt_id]);
+  await asUser("teacher@school.org", "select admin_extend_time(array[$1::uuid], 10)", [y.attempt_id]);
+  const qid = y.questions[0].id;
+  const hby = (await asAnon("select heartbeat($1,$2,$3,0) j", [y.attempt_id, y.token, { [qid]: 0 }])).j;
+  const left = (Date.parse(hby.deadline) - Date.now()) / 60000;
+  ok(hby.status === "in_progress" && left > 9 && left <= 10.1, "late student gets the extra time from now and keeps going");
+  ok((await one("select answered_count from attempts where id=$1", [y.attempt_id])).answered_count === 1, "answers accepted again after extension");
+  const done = (await one("select count(*)::int n from attempts where status <> 'in_progress'")).n;
+  await asUser("teacher@school.org", "select admin_extend_time(null, 5)");
+  ok((await one("select count(*)::int n from attempts where status <> 'in_progress'")).n === done, "finished attempts are not reopened");
+}
+
 // --- pairs never drawn together, even when drawing the whole bank
 await db.exec(`update settings set access_code = '', max_attempts = 50, counts = '{"easy":99,"medium":99,"hard":99,"extreme":99}'`);
 let clash = 0;

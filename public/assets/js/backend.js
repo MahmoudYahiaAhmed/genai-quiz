@@ -95,6 +95,10 @@ class SupabaseBackend {
   terminateAll(reason) {
     return this.rpc("admin_terminate_all", { p_reason: reason });
   }
+  /** @param {string[]|null} ids null = every attempt in progress */
+  extendTime(ids, minutes) {
+    return this.rpc("admin_extend_time", { p_ids: ids, p_minutes: minutes });
+  }
   deleteAttempt(id) {
     return this.table(this.db.from("attempts").delete().eq("id", id));
   }
@@ -365,6 +369,18 @@ class LocalBackend {
         if (!ids.includes(a.id) || a.status !== "in_progress") return a;
         n += 1;
         return this.grade(a, "terminated", reason);
+      }),
+    }));
+    return n;
+  }
+  async extendTime(ids, minutes) {
+    let n = 0;
+    this.update((db) => ({
+      ...db,
+      attempts: db.attempts.map((a) => {
+        if (a.status !== "in_progress" || (ids && !ids.includes(a.id))) return a;
+        n += 1;
+        return { ...a, deadline: new Date(Math.max(Date.parse(a.deadline), Date.now()) + minutes * 60000).toISOString() };
       }),
     }));
     return n;

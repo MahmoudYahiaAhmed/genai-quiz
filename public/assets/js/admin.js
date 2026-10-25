@@ -74,6 +74,7 @@ async function showDashboard() {
       <span class="switch"><input type="checkbox" id="open-toggle" ${settings.exam_open ? "checked" : ""}><span></span></span>
       <b id="open-label">${settings.exam_open ? "Exam OPEN" : "Exam closed"}</b>
     </label>
+    <button class="btn sm" id="extend-all">+ Extra time for all</button>
     <button class="btn danger sm" id="stop-all">Terminate all active</button>
     <span class="muted small">${esc(view.email)}</span>
     <button class="btn sm" id="logout">Sign out</button>`;
@@ -90,6 +91,7 @@ async function showDashboard() {
     }
   });
   $("#stop-all").addEventListener("click", terminateAll);
+  $("#extend-all").addEventListener("click", () => extendTime(null));
   $("#logout").addEventListener("click", async () => {
     await backend.signOut();
     view.email = null;
@@ -188,7 +190,7 @@ function renderAttemptsPanel() {
       </div>
       <div class="table-wrap">
         <table class="data">
-          <thead><tr><th>Student</th><th>Status</th><th>Progress</th><th>Score</th><th>Left tab</th><th>Started</th><th>Time used</th><th></th></tr></thead>
+          <thead><tr><th>Student</th><th>Status</th><th>Progress</th><th>Score</th><th>Left tab</th><th>Started</th><th>Time</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -234,10 +236,13 @@ function renderAttemptRows() {
         <td>${a.percent === null ? "—" : `<b>${a.percent}%</b><div class="muted small">${a.score}/${a.max_score}</div>`}</td>
         <td>${a.tab_switches ? `<span class="pill ${a.tab_switches > 3 ? "st-terminated" : "st-expired"}">${a.tab_switches}×</span>` : '<span class="muted">0</span>'}</td>
         <td class="small">${fmtTime(a.started_at)}</td>
-        <td class="small mono">${fmtDuration(end - Date.parse(a.started_at))}</td>
+        <td class="small mono">${a.status === "in_progress"
+          ? `<b>${fmtDuration(Date.parse(a.deadline) - Date.now())}</b><div class="muted">left</div>`
+          : `${fmtDuration(end - Date.parse(a.started_at))}<div class="muted">used</div>`}</td>
         <td style="white-space:nowrap">
           <button class="btn sm" data-act="view" data-id="${a.id}">View</button>
-          ${a.status === "in_progress" ? `<button class="btn sm danger" data-act="kill" data-id="${a.id}">Terminate</button>` : ""}
+          ${a.status === "in_progress" ? `<button class="btn sm" data-act="time" data-id="${a.id}" title="Give this student extra time">+ Time</button>
+          <button class="btn sm danger" data-act="kill" data-id="${a.id}">Terminate</button>` : ""}
           <button class="btn sm ghost" data-act="del" data-id="${a.id}" title="Delete attempt (lets the student start again)">Reset</button>
         </td></tr>`;
     })
@@ -267,6 +272,7 @@ async function onRowAction(e) {
       toast(friendlyError(err), "error");
     }
   }
+  if (b.dataset.act === "time") return extendTime([a.id], a.student_name);
   if (b.dataset.act === "del") {
     const sure = await askDialog({
       title: `Reset ${a.student_name}'s attempt?`,
@@ -282,6 +288,29 @@ async function onRowAction(e) {
     } catch (err) {
       toast(friendlyError(err), "error");
     }
+  }
+}
+
+/** @param {string[]|null} ids null = everyone in progress */
+async function extendTime(ids, studentName = "") {
+  const active = view.attempts.filter((a) => a.status === "in_progress").length;
+  if (!ids && !active) return toast("No active attempts.");
+  const who = ids ? studentName : `all ${active} student(s) still in the exam`;
+  const answer = await askDialog({
+    title: `Give extra time to ${who}`,
+    body: "Minutes to add. The exam stays open and their timers update within about 10 seconds. Students who already finished are not affected.",
+    input: "10",
+    confirmLabel: "Add time",
+  });
+  if (answer === false) return;
+  const minutes = Math.round(Number(answer));
+  if (!Number.isFinite(minutes) || minutes < 1 || minutes > 600) return toast("Enter a number of minutes between 1 and 600.", "error");
+  try {
+    const n = await backend.extendTime(ids, minutes);
+    toast(`Added ${minutes} min for ${n} student(s).`, "success");
+    refresh();
+  } catch (err) {
+    toast(friendlyError(err), "error");
   }
 }
 
